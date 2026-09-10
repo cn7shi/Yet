@@ -246,3 +246,12 @@ if (content.isNotEmpty()) {
 * `[versions]`：相当于 Maven 的 `<properties><compose.version>...</properties>`。
 * `[libraries]`：相当于 Maven 的 `<dependency>` 声明。
 * 在 `build.gradle.kts` 中通过强类型的 `libs.xxx` 引用，避免了过去硬编码字符串拼写错误的隐患。
+
+---
+
+## 10. 现代 Android MVVM 架构解耦实战
+
+### 1. 为什么必须把 UI 和存储拆开？（告别大坨代码）
+* **职责单一原则（SRP）**：`NoteViewModel` 作为大脑（Service + DAO），专门处理状态与磁盘 IO；`NoteScreen` 作为颜值（View），只做组件装配。
+* **状态封装（`private set`）**：ViewModel 内部的状态 `var content by mutableStateOf(...) private set`，外部 UI 只能读取，不能随意非法篡改，修改必须走显式方法调用（`onContentChange`）。
+* **组件原子化（Atomic Composables）**：将主容器拆解为 `NoteInputField`、`ClearFab`、`ClearConfirmDialog` 独立积木，主页面函数收敛为 15 行极度清晰的“目录大纲”，任何人 10 秒内看懂全局。
