@@ -164,10 +164,32 @@ fun GreetingPreview() {
 
 - [x] **Step 1: 创建工程与基础知识筑基**
   - [x] 选择 Empty Activity (Jetpack Compose) 模板
-  - [x] 建立本地 Git 仓库与分支管理规范
+  - [x] 建立本地 Git 仓库与分支管理规范（掌握 origin, main, -u 的面向对象本质）
   - [x] 建立《Yet》结对学习知识手册 (`LEARNING_NOTES.md`)
-  - [ ] 在模拟器/真机上点亮屏幕（运行 Hello World）
-- [ ] **Step 2: 极简纯文本输入页面**（打通 Compose State 状态驱动模型）
+  - [x] 在模拟器/真机上点亮屏幕（运行 Hello World）
+- [x] **Step 2: 极简纯文本输入页面**
+  - [x] 深刻理解 Modifier 的本质：强类型“施工规格说明书（Spec Object）”
+  - [x] 掌握 UI 隔离（UI Isolation）哲学：为什么 Preview 相当于 UI 的单元测试
+  - [x] 实现纯文本全屏输入框 `NoteScreen` 与响应式状态 `mutableStateOf`
 - [ ] **Step 3: 本地持久化存储**（打通生命周期保存，退出 App 内容不丢）
 - [ ] **Step 4: 一键清空/重置交互**（打通事件监听与确认机制）
 - [ ] **Step 5: 极简 UI 设计重构与 Google Play 签名打包**（生成 .aab 发布包）
+
+---
+
+## 7. 进阶核心：Modifier 施工规格书与 Compose 状态
+
+### 为什么说 Modifier 是一份【施工规格书】？
+在 Java 业务开发中，我们常用建造者模式配置一个规范：
+```java
+WidgetSpec spec = new WidgetSpec().fillMaxSize().padding(16);
+```
+Compose 的 `Modifier` 也是一样：
+- `Text`、`TextField` 是真正的实体积木。
+- `Modifier` 是贴在积木上的强类型施工要求清单。
+- 父容器（`Scaffold`）计算出刘海屏/状态栏的安全间距，写入规格书传给子组件 `NoteScreen(modifier)`；子组件在规格书上追加自己的全屏要求 `.fillMaxSize()`，然后贴给 `TextField` 施工。这样彻底实现了组件的解耦与多终端复用。
+
+### 为什么退出 App 文字会丢？
+目前 `content` 的状态是由 `remember { mutableStateOf("") }` 保存在 **内存堆（RAM）** 里的。  
+当 Activity 经历生命周期 `onStop` -> `onDestroy` 或被系统杀进程后，内存被操作系统回收，文字就会丢失。  
+👉 **这就是我们 Step 3 要解决的硬核工程问题：本地数据持久化（Disk Persistence）！**
