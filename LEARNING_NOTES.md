@@ -171,7 +171,11 @@ fun GreetingPreview() {
   - [x] 深刻理解 Modifier 的本质：强类型“施工规格说明书（Spec Object）”
   - [x] 掌握 UI 隔离（UI Isolation）哲学：为什么 Preview 相当于 UI 的单元测试
   - [x] 实现纯文本全屏输入框 `NoteScreen` 与响应式状态 `mutableStateOf`
-- [ ] **Step 3: 本地持久化存储**（打通生命周期保存，退出 App 内容不丢）
+- [x] **Step 3: 本地持久化存储**
+  - [x] 深刻理解 RAM（运行桌面） vs ROM/Flash（档案柜）的存储边界
+  - [x] 掌握 `Context` 句柄与 `MODE_PRIVATE` 沙盒安全隔离
+  - [x] 实现 `SharedPreferences` 异步双层刷盘（`apply()` vs `commit()`）
+  - [x] 梳理 `SharedPreferences` 与 `Room` 关系型数据库的选型边界
 - [ ] **Step 4: 一键清空/重置交互**（打通事件监听与确认机制）
 - [ ] **Step 5: 极简 UI 设计重构与 Google Play 签名打包**（生成 .aab 发布包）
 
@@ -189,7 +193,24 @@ Compose 的 `Modifier` 也是一样：
 - `Modifier` 是贴在积木上的强类型施工要求清单。
 - 父容器（`Scaffold`）计算出刘海屏/状态栏的安全间距，写入规格书传给子组件 `NoteScreen(modifier)`；子组件在规格书上追加自己的全屏要求 `.fillMaxSize()`，然后贴给 `TextField` 施工。这样彻底实现了组件的解耦与多终端复用。
 
-### 为什么退出 App 文字会丢？
-目前 `content` 的状态是由 `remember { mutableStateOf("") }` 保存在 **内存堆（RAM）** 里的。  
-当 Activity 经历生命周期 `onStop` -> `onDestroy` 或被系统杀进程后，内存被操作系统回收，文字就会丢失。  
-👉 **这就是我们 Step 3 要解决的硬核工程问题：本地数据持久化（Disk Persistence）！**
+---
+
+## 8. 本地持久化核心：SharedPreferences vs Room
+
+### 1. RAM（内存）与 ROM/Flash（闪存）的物理界限
+* **RAM（8GB/12GB）—— 办公桌面**：只有当前前台运行的 App 占用，进程被杀（Kill）后系统立刻清扫收回，断电即失。
+* **ROM/Flash（256GB/512GB）—— 档案柜**：关机断电不丢。系统分为两块：
+  * `shared_prefs/` 与 `files/`：核心数据区，系统绝不敢随意删除，除非用户清除数据或卸载。
+  * `cache/`：临时缓存区，手机闪存吃紧时系统会强制无情抹除。
+
+### 2. SharedPreferences 物理实现与线程机制
+* **物理位置**：`/data/data/com.cn7shi.yet/shared_prefs/yet_prefs.xml`
+* **`MODE_PRIVATE`**：基于 Linux UID 的应用沙盒保护，其他 App 无法跨界读取。
+* **`apply()` vs `commit()`**：
+  * `commit()`：同步刷盘，会阻塞 UI 渲染主线程，引起掉帧。
+  * `apply()`：瞬间更新内存快照，并把任务排队到后台异步写入磁盘，UI 流畅丝滑。
+* **生命周期安全保障**：在 Activity `onStop()` 进程彻底回收前，主线程会确保后台未完成的 `apply()` 刷盘排队全部执行完毕，草稿绝对不丢。
+
+### 3. SharedPreferences vs Room 选型
+* **SharedPreferences**：适合单篇草稿、用户设置开关、登录 Token，0 配置、毫秒级响应。
+* **Room（SQLite ORM）**：相当于 Spring Data JPA + MySQL，适合多条笔记管理、标题/时间/标签多字段过滤、全文检索与分页。
