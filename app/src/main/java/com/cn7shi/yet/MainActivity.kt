@@ -20,6 +20,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import com.cn7shi.yet.ui.theme.YetTheme
 
 class MainActivity : ComponentActivity() {
-    // 注入大脑 ViewModel
     private val viewModel by viewModels<NoteViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,11 +43,7 @@ class MainActivity : ComponentActivity() {
                     NoteScreen(
                         content = viewModel.content,
                         onContentChange = viewModel::onContentChange,
-                        isClearVisible = viewModel.isClearButtonVisible,
-                        showClearDialog = viewModel.showClearDialog,
-                        onOpenClearDialog = viewModel::openClearDialog,
-                        onConfirmClear = viewModel::confirmClear,
-                        onDismissClearDialog = viewModel::dismissClearDialog,
+                        onClearNote = viewModel::clearNote,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
@@ -54,20 +53,21 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * 极简记事本主页面（容器组装器：总揽全局大纲）
- * 每一块具体功能都被拆成下面的独立子组件，层次极其清晰！
+ * 极简记事本页面（纯 UI 表现层）
+ * 核心设计：
+ * - 接收业务数据 content 和业务动作回调
+ * - 内部自主管理 UI 交互控制状态（如弹窗开关 showDialog）
  */
 @Composable
 fun NoteScreen(
     content: String,
     onContentChange: (String) -> Unit,
-    isClearVisible: Boolean,
-    showClearDialog: Boolean,
-    onOpenClearDialog: () -> Unit,
-    onConfirmClear: () -> Unit,
-    onDismissClearDialog: () -> Unit,
+    onClearNote: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // 弹窗属于 UI 交互的内部瞬态（UI Ephemeral State），由视图层自己打理！
+    var showClearDialog by remember { mutableStateOf(false) }
+
     Box(modifier = modifier.fillMaxSize()) {
         // 1. 底层：纯文本打字区域
         NoteInputField(
@@ -75,26 +75,29 @@ fun NoteScreen(
             onContentChange = onContentChange
         )
 
-        // 2. 顶层右下角：一键清空按钮（带状态控制）
-        if (isClearVisible) {
+        // 2. 顶层右下角：一键清空按钮（有字时才可见）
+        if (content.isNotEmpty()) {
             ClearFab(
-                onClick = onOpenClearDialog,
+                onClick = { showClearDialog = true },
                 modifier = Modifier.align(Alignment.BottomEnd)
             )
         }
     }
 
-    // 3. 二次确认弹窗
+    // 3. 页面内部的二次确认弹窗
     if (showClearDialog) {
         ClearConfirmDialog(
-            onConfirm = onConfirmClear,
-            onDismiss = onDismissClearDialog
+            onConfirm = {
+                onClearNote() // 触发真正的底层清空业务
+                showClearDialog = false
+            },
+            onDismiss = { showClearDialog = false }
         )
     }
 }
 
 /**
- * 子组件 1：纯文本输入框（只负责打字视觉）
+ * 子积木 1：纯文本输入框
  */
 @Composable
 private fun NoteInputField(
@@ -116,7 +119,7 @@ private fun NoteInputField(
 }
 
 /**
- * 子组件 2：悬浮清空小按钮（只负责按钮本身）
+ * 子积木 2：悬浮清空小按钮
  */
 @Composable
 private fun ClearFab(
@@ -137,7 +140,7 @@ private fun ClearFab(
 }
 
 /**
- * 子组件 3：二次确认弹窗（只负责弹窗本身）
+ * 子积木 3：二次确认弹窗
  */
 @Composable
 private fun ClearConfirmDialog(
@@ -162,7 +165,7 @@ private fun ClearConfirmDialog(
 }
 
 /**
- * IDE 预览器：因为解耦了，我们可以随时随地塞假数据预览不同状态！
+ * IDE 预览器
  */
 @Preview(showBackground = true)
 @Composable
@@ -171,11 +174,7 @@ fun NoteScreenPreview() {
         NoteScreen(
             content = "这是一篇充满设计感的极简便签...",
             onContentChange = {},
-            isClearVisible = true,
-            showClearDialog = false,
-            onOpenClearDialog = {},
-            onConfirmClear = {},
-            onDismissClearDialog = {}
+            onClearNote = {}
         )
     }
 }
