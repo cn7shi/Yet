@@ -176,7 +176,11 @@ fun GreetingPreview() {
   - [x] 掌握 `Context` 句柄与 `MODE_PRIVATE` 沙盒安全隔离
   - [x] 实现 `SharedPreferences` 异步双层刷盘（`apply()` vs `commit()`）
   - [x] 梳理 `SharedPreferences` 与 `Room` 关系型数据库的选型边界
-- [ ] **Step 4: 一键清空/重置交互**（打通事件监听与确认机制）
+- [x] **Step 4: 一键清空/重置交互**
+  - [x] 深刻理解 Compose 声明式弹窗哲学：`if (showDialog) { AlertDialog(...) }`
+  - [x] 掌握 `Box` 层叠布局与 `Alignment.BottomEnd` 锚定技术
+  - [x] 体验“状态驱动可见性”：`if (content.isNotEmpty())` 优雅淡入淡出悬浮按钮
+  - [x] 掌握现代 Gradle Version Catalog（`libs.versions.toml`）依赖管理
 - [ ] **Step 5: 极简 UI 设计重构与 Google Play 签名打包**（生成 .aab 发布包）
 
 ---
@@ -214,3 +218,31 @@ Compose 的 `Modifier` 也是一样：
 ### 3. SharedPreferences vs Room 选型
 * **SharedPreferences**：适合单篇草稿、用户设置开关、登录 Token，0 配置、毫秒级响应。
 * **Room（SQLite ORM）**：相当于 Spring Data JPA + MySQL，适合多条笔记管理、标题/时间/标签多字段过滤、全文检索与分页。
+
+---
+
+## 9. 声明式弹窗与图层堆叠（Box + Dialog）
+
+### 1. 弹窗没有生命周期句柄，只有 `if (showDialog)`
+传统 Java Android 需要 `dialog.show()` 和 `dialog.dismiss()` 来操纵窗口句柄，极易引发 `Activity has leaked window` 内存泄漏崩溃。  
+在 Compose 中：
+```kotlin
+if (showClearDialog) {
+    AlertDialog(...)
+}
+```
+弹窗直接由布尔状态 `showClearDialog` 驱动。当设为 `false`，组件自动从组合树上被摘除，内存天然安全。
+
+### 2. 条件渲染带来极致的极简设计
+```kotlin
+if (content.isNotEmpty()) {
+    SmallFloatingActionButton(...)
+}
+```
+当记事本为空时，屏幕干干净净，没有任何多余按钮干扰思考；当用户敲下第一个字，清空垃圾桶按钮瞬间优雅呈现。这就是“数据状态驱动 UI”的最美写照。
+
+### 3. Gradle Version Catalog (`libs.versions.toml`) vs Maven POM
+现代 Android 使用 `gradle/libs.versions.toml` 统一管理版本号与依赖库：
+* `[versions]`：相当于 Maven 的 `<properties><compose.version>...</properties>`。
+* `[libraries]`：相当于 Maven 的 `<dependency>` 声明。
+* 在 `build.gradle.kts` 中通过强类型的 `libs.xxx` 引用，避免了过去硬编码字符串拼写错误的隐患。
