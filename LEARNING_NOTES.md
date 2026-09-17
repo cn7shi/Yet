@@ -255,3 +255,47 @@ if (content.isNotEmpty()) {
 * **职责单一原则（SRP）**：`NoteViewModel` 作为大脑（Service + DAO），专门处理状态与磁盘 IO；`NoteScreen` 作为颜值（View），只做组件装配。
 * **状态封装（`private set`）**：ViewModel 内部的状态 `var content by mutableStateOf(...) private set`，外部 UI 只能读取，不能随意非法篡改，修改必须走显式方法调用（`onContentChange`）。
 * **组件原子化（Atomic Composables）**：将主容器拆解为 `NoteInputField`、`ClearFab`、`ClearConfirmDialog` 独立积木，主页面函数收敛为 15 行极度清晰的“目录大纲”，任何人 10 秒内看懂全局。
+
+---
+
+## 11. 底部导航与 Compose 核心语法深度解密
+
+### 1. `var currentScreen by remember { mutableStateOf(...) }` 语法解密
+这行经典代码由三个零件像乐高一样紧密咬合：
+
+| 零件 | 作用与职责 | Java 对照理解 |
+| :--- | :--- | :--- |
+| **`mutableStateOf(...)`** | **响应式雷达**：监听数据变化。一旦值改变，立刻通知 Compose 重绘相关 UI 节点。 | 类似 `Observable<T>` 或带监听器的 `AtomicReference<T>`。 |
+| **`remember { ... }`** | **防失忆小抽屉**：Compose 函数每次重绘都会从头到尾重新执行。`remember` 保证在重新执行时，直接复用上一次创建的对象，而不是每次都重置为默认值。 | 类似单例缓存或方法跨次调用的状态持久化容器。 |
+| **`by` 关键字** | **属性委托代理人（语法糖）**：底层实际持有 `MutableState<T>` 包装盒。使用 `by` 代理后，编译器自动帮你调用 `.value`，你可以像操作最普通的原始类型变量一样读写它。 | 类似 Lombok 自动生成并在调用时透明代理 getter/setter。 |
+
+* **如果没有 `remember` 会发生什么？**  
+  用户点击切换到“页面 B”，Compose 触发函数重绘；但因为没有 `remember` 缓存，第一行代码会重新执行并把变量强制重置回“页面 A”。用户无论怎么点，页面永远卡在 A！
+
+---
+
+### 2. `Scaffold` 里的 `innerPadding` 到底是什么？
+```kotlin
+Scaffold(
+    bottomBar = { YetBottomBar(...) }
+) { innerPadding ->
+    // 必须通过 modifier.padding(innerPadding) 把尺子传递给内容区！
+    NavigationContent(modifier = Modifier.padding(innerPadding))
+}
+```
+
+* **本质含义**：`Scaffold` 预先测量了顶部状态栏（刘海屏挖孔）和底部导航栏（约 80dp）的物理尺寸，将上下左右的安全留白打包成一个 `PaddingValues` 对象（即 `innerPadding`）作为 Lambda 参数递交给你。
+* **Java 语法映射**：`{ innerPadding -> ... }` 完全等同于 Java 8 的单入参 Lambda 表达式：
+  ```java
+  scaffold.setContent(innerPadding -> { ... });
+  ```
+* **如果不消费它会怎样？**  
+  界面内容会直接从屏幕物理边缘 y = 0 顶格画到底，页面最下方的按钮会被底部导航栏死死盖住，导致用户看不见、摸不着。
+
+---
+
+### 3. Thin Activity（薄 Activity）工程规范
+拒绝在 `MainActivity` 的 `onCreate` 里面写层层嵌套的“金字塔楼梯代码（Staircase Code）”：
+* **`MainActivity`** 仅保留 3 行，作为纯粹的操作系统开机插头；
+* 整体应用总成收敛于 **`YetApp`**；
+* 底部导航栏与内容分发各自下沉为独立的纯函数组件（**`YetBottomBar`** 与 **`NavigationContent`**），结构一马平川。
