@@ -9,10 +9,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
@@ -27,10 +33,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.cn7shi.yet.ui.theme.YetTheme
 
+/**
+ * 页面枚举：定义底部导航的 4 个占位标签
+ */
+enum class Screen(val label: String, val icon: ImageVector) {
+    PAGE_A("页面 A", Icons.Default.Home),
+    PAGE_B("页面 B", Icons.AutoMirrored.Filled.List),
+    PAGE_C("页面 C", Icons.Default.Favorite),
+    PAGE_D("页面 D", Icons.Default.Settings)
+}
+
+/**
+ * 1. Thin Activity 规范：MainActivity 彻底瘦身为纯粹的开机插头！
+ */
 class MainActivity : ComponentActivity() {
     private val viewModel by viewModels<NoteViewModel>()
 
@@ -38,25 +58,96 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            YetTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    NoteScreen(
-                        content = viewModel.content,
-                        onContentChange = viewModel::onContentChange,
-                        onClearNote = viewModel::clearNote,
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
-            }
+            YetApp(viewModel = viewModel)
         }
     }
 }
 
 /**
- * 极简记事本页面（纯 UI 表现层）
- * 核心设计：
- * - 接收业务数据 content 和业务动作回调
- * - 内部自主管理 UI 交互控制状态（如弹窗开关 showDialog）
+ * 2. 整个 App 的根总成容器（一马平川，无深层嵌套）
+ */
+@Composable
+fun YetApp(viewModel: NoteViewModel) {
+    YetTheme {
+        // 当前选中的 Tab 状态
+        var currentScreen by remember { mutableStateOf(Screen.PAGE_A) }
+
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            bottomBar = {
+                YetBottomBar(
+                    currentScreen = currentScreen,
+                    onScreenSelected = { currentScreen = it }
+                )
+            }
+        ) { innerPadding ->
+            NavigationContent(
+                currentScreen = currentScreen,
+                viewModel = viewModel,
+                modifier = Modifier.padding(innerPadding)
+            )
+        }
+    }
+}
+
+/**
+ * 3. 独立底栏组件：负责渲染 4 个导航按钮
+ */
+@Composable
+private fun YetBottomBar(
+    currentScreen: Screen,
+    onScreenSelected: (Screen) -> Unit
+) {
+    NavigationBar {
+        Screen.values().forEach { screen ->
+            NavigationBarItem(
+                selected = (currentScreen == screen),
+                onClick = { onScreenSelected(screen) },
+                icon = { Icon(screen.icon, contentDescription = screen.label) },
+                label = { Text(screen.label) }
+            )
+        }
+    }
+}
+
+/**
+ * 4. 独立内容路由组件：根据选中的 Screen 分发显示具体页面
+ */
+@Composable
+private fun NavigationContent(
+    currentScreen: Screen,
+    viewModel: NoteViewModel,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        when (currentScreen) {
+            Screen.PAGE_A -> NoteScreen(
+                content = viewModel.content,
+                onContentChange = viewModel::onContentChange,
+                onClearNote = viewModel::clearNote
+            )
+            Screen.PAGE_B -> PlaceholderScreen("这是占位页面 B")
+            Screen.PAGE_C -> PlaceholderScreen("这是占位页面 C")
+            Screen.PAGE_D -> PlaceholderScreen("这是占位页面 D")
+        }
+    }
+}
+
+/**
+ * 占位页面组件：居中显示大标题
+ */
+@Composable
+private fun PlaceholderScreen(title: String) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = title, style = MaterialTheme.typography.headlineMedium)
+    }
+}
+
+/**
+ * 业务页面：极简便签（保留此前完美的解耦设计）
  */
 @Composable
 fun NoteScreen(
@@ -65,17 +156,14 @@ fun NoteScreen(
     onClearNote: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 弹窗属于 UI 交互的内部瞬态（UI Ephemeral State），由视图层自己打理！
     var showClearDialog by remember { mutableStateOf(false) }
 
     Box(modifier = modifier.fillMaxSize()) {
-        // 1. 底层：纯文本打字区域
         NoteInputField(
             content = content,
             onContentChange = onContentChange
         )
 
-        // 2. 顶层右下角：一键清空按钮（有字时才可见）
         if (content.isNotEmpty()) {
             ClearFab(
                 onClick = { showClearDialog = true },
@@ -84,11 +172,10 @@ fun NoteScreen(
         }
     }
 
-    // 3. 页面内部的二次确认弹窗
     if (showClearDialog) {
         ClearConfirmDialog(
             onConfirm = {
-                onClearNote() // 触发真正的底层清空业务
+                onClearNote()
                 showClearDialog = false
             },
             onDismiss = { showClearDialog = false }
@@ -96,9 +183,6 @@ fun NoteScreen(
     }
 }
 
-/**
- * 子积木 1：纯文本输入框
- */
 @Composable
 private fun NoteInputField(
     content: String,
@@ -118,9 +202,6 @@ private fun NoteInputField(
     )
 }
 
-/**
- * 子积木 2：悬浮清空小按钮
- */
 @Composable
 private fun ClearFab(
     onClick: () -> Unit,
@@ -139,9 +220,6 @@ private fun ClearFab(
     }
 }
 
-/**
- * 子积木 3：二次确认弹窗
- */
 @Composable
 private fun ClearConfirmDialog(
     onConfirm: () -> Unit,
@@ -164,17 +242,10 @@ private fun ClearConfirmDialog(
     )
 }
 
-/**
- * IDE 预览器
- */
 @Preview(showBackground = true)
 @Composable
-fun NoteScreenPreview() {
+fun YetAppPreview() {
     YetTheme {
-        NoteScreen(
-            content = "这是一篇充满设计感的极简便签...",
-            onContentChange = {},
-            onClearNote = {}
-        )
+        PlaceholderScreen("Yet App Preview")
     }
 }
